@@ -47,7 +47,7 @@ class list
 // Dynamically creates new vectors when they run out of space
 // Values stored in leaf nodes
 // Split input index into chunks to figure out which child to go to
-
+// For immutable tries, do copy-on-write to avoid copying entire tries
 
 int main(int argc, char** argv)
 {
