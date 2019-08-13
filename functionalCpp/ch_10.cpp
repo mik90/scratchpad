@@ -3,6 +3,7 @@
 #include <numeric>
 #include <utility>
 #include <variant>
+#include "../../range-v3/include/range/v3/all.hpp"
 
 // 10. Monads
 // 10.1
@@ -38,8 +39,58 @@ auto transform(const std::optional<T1>& opt, F f)
 // A monad is something you can construct and mbind to a function
 
 // 10.3
-//
+// Create a functor from std::vector
+template <typename T, typename F>
+auto transform(const std::vector<T>& xs, F f)
+{
+  // Transform vector xs with function of type F, f
+  return xs | view::transform(f) | to_vector;
+}
+// Construct vector from a single value
+template <typename T>
+std::vector<T> make_vector(T&& value)
+{
+  return {std::forward<T>(value)};
+}
 
+// Creating these temporaries is inefficient, but this is
+// done as an example
+template <typename T, typename F>
+auto mbind(const std::vector<T>& xs, F f)
+{
+  // Calls f which gives us a range of vectors.
+  // Convert that range to a vector
+  auto transformed = xs | view::transform(f)
+                        | to_vector;
+  // Convert the vector of vectors to a single vector
+  return transformed | view::join | to_vector;
+}
+
+// 10.4 Range and monad comprehensions
+// Create a filtering function:
+template <typename C, typename P>
+auto filter(const C& collection, P predicate)
+{
+  // Runs the lambda on each element in the collection
+  return collection | mbind([=] (auto element)
+      {
+        // Creates range with either 1 or 0 elements
+        return view::single(element) 
+                | view::take(predicate(element) ? 1 : 0);
+      }
+}
+
+// A range comprehension has two components:
+// for_each - traverses a collection and collects all the values
+// yielded from the function it was given
+// With multiple nested comprehensions, the yielded values are
+// places consecutively so it's all flattened out.
+// yield_if - puts a value in the resulting range if the predicate
+// is satisfied
+// 
+// These are also called monad comprehensions
+
+// 10.5
 
 int main(int argc, char** argv)
 {
