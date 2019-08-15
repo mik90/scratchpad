@@ -90,7 +90,54 @@ auto filter(const C& collection, P predicate)
 // 
 // These are also called monad comprehensions
 
-// 10.5
+// 10.5 failure handling
+// Use std::optional as a monad
+//
+// Use mbind to strip off the context and transform opt using
+// function F f. It will return either
+// the underlying, transformed, object or nothing.
+//
+// These can be chained together where opt will keep being
+// transformed as long as it is a valid value. At the end
+// it will either be valid or empty.
+template <typename T, typename F>
+auto mbind(const std::optional<T>& opt, F f) -> decltype(f(opt.value()))
+{
+  if (opt)
+    return f(opt.value());
+  else
+    return {};
+}
+
+/* e.g.
+ *
+ * std::optional<std::string> current_user_html()
+ * {
+ *  return mbind(
+ *          mbind(current_login, user_full_name),
+ *          to_html);
+ * }
+ */
+// expected<T,E> tells you what the error is
+
+// F can return whatever type it wants
+//
+// This will keep call f on exp unless there's an error
+template <
+  typename T,typename E, typename F,
+  typename Ret = typename std::result_of<F(T)>::type
+    >
+Ret mbind(const expected<T, E>& exp, F f)
+{
+  // Return the error from expected if there is one
+  if (!exp)
+    return Ret::error(exp.error());
+
+  // Otherwise, call f on the value of expected
+  return f(exp.value());
+}
+
+// The try monad
 
 int main(int argc, char** argv)
 {
