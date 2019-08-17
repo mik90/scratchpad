@@ -138,6 +138,61 @@ Ret mbind(const expected<T, E>& exp, F f)
 }
 
 // The try monad
+// Passes an exception_ptr if an exception is thrown 
+template <typename F,
+          typename Ret = typename std::result_of<F()>::type,
+          typename Exp = expected<Ret, std::exception_ptr>
+Exp mtry(F f)
+{
+  // f cannot have any arguments, to call it with arguments, a lambda can be
+  // used as f
+  try {
+    return Exp::success(f());
+  }
+  catch (...) {
+    return Exp::error(std::current_exception());
+  }
+}
+
+// Handling state with monads
+// Simplest way is to pass the state along with other arguments
+// and have it return the new state
+//
+// Something along the lines of a debugging log which is passed
+// through from function to function is often referred to as a
+// Writer monad.
+template <typename T>
+class with_log {
+  public:
+    with_log(T value, std::string log = std::string) :
+      m_value(value), m_log(log) {}
+    T value() const { return m_value; }
+    std::string log() const { return m_log; }
+  private:
+    T m_value;
+    std::string m_log;
+};
+
+// Can be used by functions as:
+// with_log<std::string> user_full_name(const std::string& login);
+// with_log<std::string> to_html(const std::string& text);
+
+// An mbind needs to be implemented for it
+// It will take in an instance of with_log
+tempalte <typename T,
+          typename F,
+          typename Ret = typename std::result_of<F(T)>::type>
+Ret mbind(const with_log<T>& val, F f)
+{
+  // Transform the value with f(). Returns the result
+  // of the transformation along with the log
+  const auto result_with_log = f(val.value());
+  // Return the result. The log should be concatenated with the
+  // previous log.
+  return Ret(result_with_log.value(), val.log() + result_with_log.log());
+}
+
+// Concurrency and the continuation monad
 
 int main(int argc, char** argv)
 {
