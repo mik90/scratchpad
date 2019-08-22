@@ -3,7 +3,7 @@
 #include <numeric>
 #include <utility>
 #include <variant>
-#include "../../range-v3/include/range/v3/all.hpp"
+#include "../../libraries/range-v3/include/range/v3/all.hpp"
 
 // 10. Monads
 // 10.1
@@ -193,6 +193,55 @@ Ret mbind(const with_log<T>& val, F f)
 }
 
 // Concurrency and the continuation monad
+// 10.7
+// Future: instead of waiting for data to arrive,
+// a function can return a handler for data that 
+// will be available sometime in the future
+// future<T> is kind of like a container
+// Future is a functor, can take function f and
+// transform <T1> to <T2>
+//
+// Since these operations can take a while, they can
+// return futures
+// future<std::string> user_full_name(const std::string& login);
+// future<std::string> to_html(const std::string& text);
+// mbind can help deal with a future of a future
+future<std::string> current_user_html()
+{
+  return current_user() | mbind(user_full_name)
+                        | mbind(to_html);
+}
+
+// Functions passed to mbind are continuations. A monad dealing
+// with a sequence of future values is called the continuation monad
+// To be used with callbacks and signals, this function could be split
+// into multiple ones. Every time an async operation is called, you'd need
+// to create a new function to handle the result.
+
+// Implementation of futures
+// future can contain an exception if the operation failed.
+// Only way to get the value is through the member function .get()
+// which will block if the future isn't ready.
+//
+// Can add a .then() which can be used to define what shall be done
+// with the value once it is available
+//
+// .then() takes a function whose argument is an already completed
+// future object and whose return type is a new future object. 
+//
+// This makes the mbind function simple
+template <typename T, typename F>
+auto mbind(const future<T>& future, F f)
+{
+  return future.then([] (future<T> finished)
+      {
+        // Doesn't block since this is only called when
+        // the result is ready or an exception has occured
+        return f(finished.get());
+      });
+}
+
+// 10.8 Monadic composition
 
 int main(int argc, char** argv)
 {
