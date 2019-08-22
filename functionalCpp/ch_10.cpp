@@ -242,6 +242,37 @@ auto mbind(const future<T>& future, F f)
 }
 
 // 10.8 Monadic composition
+// Monads can be composed together much like how functions can have 
+// their outputs go to function's input
+// M<std::string> is some monadic container for a string
+// We can create a function that composes two functions
+
+// Compose functions F and G
+template <typename F, typename G>
+auto mcompose(F f, G g)
+{
+  return [=] (auto value)
+  {
+    return mbind(f(value), g);
+  }
+}
+
+// Can combine in this way:
+// auto user_html = mcompose(user_full_name, to_html);
+//
+// auto grandchildren = mcompose(children, children);
+//
+// Composing a monadic function with the constructor function
+// for that monad results in the same function
+// 
+// mcompose(f, construct) == f
+// mcompose(construct, f) == f
+//
+// Kleisli composition - associativity law says that the order of
+// composition doesn't matter
+//
+// mcompose(f, mcompose(g,h)) == mcompose(mcompose(f, g), h)
+
 
 int main(int argc, char** argv)
 {
