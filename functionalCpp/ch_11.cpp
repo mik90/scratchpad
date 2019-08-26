@@ -87,7 +87,50 @@ auto sum(const C& collection)
     return sum_iterable(collection);
 }
 
+// 11.3 Making curried functions
+//
+// This can store a callable object and any number of
+// function arguments. This can be enough to call the 
+// callable object or it can not be enough. 
+template <typename Function, typename... CapturedArgs>
+class curried
+{
+  private:
+    using CapturedArgsTuple = std::tuple<std::decay_t<CapturedArgs>...>;
+    Function m_function;
+    std::tuple<CapturedArgs...> m_captured;
 
+    template <typename... Args>
+    static auto capture_by_copy(Args&&... args)
+    {
+      return std::tuple<std::decay_t<Args>...>
+        (std::forward<Args>(args)...);
+    }
+  public:
+    curried(Function f, CapturedArgs... args) : m_function(f),
+        m_captured(capture_by_copy(std::move(args)...))
+    { }
+    curried(Function f, std::tuple<CapturedArgs...> args) : m_function(f),
+        m_captured(std::move(args))
+    { }
+
+    template<typename... NewArgs>
+    auto operator() (NewArgs&&... args) const
+    {
+      auto new_args = capture_by_copy(std::forward<NewArgs>(args)...);
+      // Check if we now have enough arugments to call the function
+      if constexpr(std::is_invocable_v<Function, CapturedArgs..., NewArgs...>)
+      {
+        // Call it, return the result from the curried function
+      }
+      else
+      {
+        // Return a new instance of curried, with an updated
+        // amount of arguments
+      }
+    }
+
+};
 
 int main(int argc, char** argv)
 {
