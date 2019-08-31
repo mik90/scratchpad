@@ -146,9 +146,149 @@ class session : public std::enable_shared_from_this<session<EmitFunction>>
     }
 };
 
+// Modelling reactive streams as monads
+// Async/reactive streams ar elike futures except
+// with a singly linked list. However, you do not
+// get the values all at once, you get them sequentially
 
+// Requirements for a monad:
+// - Must be a generic type
+// - Need a constructor. Example: function that returns a
+// reactive stream that contains a given value
+// - Need the transformation function - function that returns
+// a reactive stream that emits transformed values coming from
+// the source stream
+// - Need a join function that takes all messages from all given
+// streams and emits them one by one
+// - Need it to obey the monad laws (? need to read more into this)
+
+// Creating a sink to receive messages
+// Sink only needs to process messages
+
+// Generic sink, takes a generic function to process messages
+//
+// This is single-owner design. The sink takes ownership of the sender.
+// Although this limits the system so you can't have multiple components
+// listen to a single actor, this can be fixed by using a shared_ptr.
+// The benefit to this is that the chain of messaging will contain all of
+// the actors in it. So when something is destroyed, it automatically destroys
+// parts of the chain that can no longer be used.
+namespace detail
+{
+  // We can use range notation to make the interface cleaner
+  // Need a helper data structure
+  template <typename Function>
+  struct sink_helper
+  {
+    Function function
+  };
+
+  template <typename Sender, typename Function,
+            typename MessageType = typename Sender::value_type>
+  class sink_impl
+  {
+    public:
+      sink_impl(Sender&& sender, Function function) 
+        : m_sender(std::move(sender)), m_function(function)
+      {
+        // Assign our message handler to our sender
+        m_sender.set_message_handler(
+            [this] (MessageType&& message)
+            {
+              process_message(std::move(message));
+            });
+      }
+
+      void process_message(MessageType&& message) const
+      {
+        // Hand over our message to the function for processing
+        std::invoke(m_function, std::move(message));
+      }
+    private:
+      Sender m_sender;
+      Function m_function;
+  };
+
+  template <typename Sender, typename Transformation,
+            typename SourceMessageType = typename Sender::value_type;
+            typename MessageType =
+              decltype(stdd::declval<Transformation>() (std::declval<SourceMessageType>()))>
+  class transform_impl
+  {
+    public:
+      using value_type = MessageType;
+
+      transform_impl(Sender&& sender, Transformation transformation)
+        : m_sender(std::move(sender)), m_transformation(transformation)
+      {
+      }
+
+      template <typename EmitFunction>
+      void set_message_handler(EmitFunction emit)
+      {
+        m_emit = emit;
+        // Connect to the actor once the actor wants their messages
+        // transformed. This meanas we now have someone to listen
+        // to our messages
+        m_sender.set_message_handler(
+            [this] (SourceMessageType&& message)
+            {
+              process_message(std::move(message));
+            });
+      }
+
+      void process_message(SourceMessageType&& message) const
+      {
+        // When processing a message, hand it over to the
+        // transformation function
+        m_emit(std::invoke(m_transformation, std::move(message)));
+      }
+    private:
+      Sender m_sender;
+      Transformation m_transformation;
+      std::function<void(MessageType&&)> m_emit;
+  };
+}
+
+// This takes a generic Sender class ang a _helper
+// class that tells us the transformation that will be made
+template <typename Sender, typename Function>
+auto operator| (Sender&& sender,
+                detail::sink_helper<Function> sink)
+{
+  return detail::sink_impl<Sender, Function>(
+      std::forward<Sender>(sender), sink.function);
+}
+
+// Creating a sink_impl
+template <typename Sender, typename Function>
+auto sink(Sender&&, Function&& function)
+{
+  return detail::sink_impl<Sender, Function>(
+      std::forward<Sender>(sender),
+      std::forward<Function>(function);
+}
 
 int main(int argc, char** argv)
 {
+  // io_service listens for events and calls appropriate callback
+  // lambdas for them
+  boost::asio::io_service event_loop;
+  /*
+  auto pipeline = sink(service(event_loop),
+      [] (const auto& message)
+      {
+        std::cerr << message << std::endl;
+      });
+  */
+
+  // Can do this instead
+  auto sink_to_cerr = sink([] (const auto& message)
+      {
+        std::cerr << message << std::endl;
+      });
+  auto pipeline = service(event_loop) | sink_to_cerr;
+  event_loop.run();
+
   return 0;
 }
