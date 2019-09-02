@@ -1,9 +1,13 @@
 #include <algorithm>
 #include <functional>
 #include <numeric>
+#include <iostream>
 #include <utility>
+#include <list>
 #include <boost/asio.hpp>
 #include <json/json.h>
+
+using boost::asio::ip::tcp;
 
 // Ch 12 Funcitonal design for concurrent systems
 // Instead of having immutable data that is shared,
@@ -180,7 +184,7 @@ namespace detail
   template <typename Function>
   struct sink_helper
   {
-    Function function
+    Function function;
   };
 
   template <typename Sender, typename Function,
@@ -210,9 +214,9 @@ namespace detail
   };
 
   template <typename Sender, typename Transformation,
-            typename SourceMessageType = typename Sender::value_type;
+            typename SourceMessageType = typename Sender::value_type,
             typename MessageType =
-              decltype(stdd::declval<Transformation>() (std::declval<SourceMessageType>()))>
+              decltype(std::declval<Transformation>() (std::declval<SourceMessageType>()))>
   class transform_impl
   {
     public:
@@ -262,12 +266,180 @@ auto operator| (Sender&& sender,
 
 // Creating a sink_impl
 template <typename Sender, typename Function>
-auto sink(Sender&&, Function&& function)
+auto sink(Sender&& sender, Function&& function)
 {
   return detail::sink_impl<Sender, Function>(
       std::forward<Sender>(sender),
-      std::forward<Function>(function);
+      std::forward<Function>(function));
 }
+
+/*
+ * example: trimming messages before printing
+ * auto pipeline = 
+ *        service(event_loop)
+ *        | transform(trim)
+ *        | sink_to_cerr;)
+ */
+
+
+// Creating a stream of given values
+//
+// In order to make the reactive streams into
+// a proper monad, we need a join function. It
+// should be able to take input values and emit
+// them all via a single output stream
+//
+// Can be used as:
+// auto pipeline = values{42} | sink_to_cerr;
+template <typename T>
+class values
+{
+  public:
+    using value_type = T;
+    explicit values(std::initializer_list<T> values)
+      : m_values(values)
+    {
+    }
+    template <typename EmitFunction>
+    void set_message_handler(EmitFunction emit)
+    {
+      m_emit = emit;
+      std::for_each(m_values.cbegin(), m_values.cend(),
+          [&] (T value) {m_emit(std::move(value)); });
+    }
+  private:
+    std::vector<T> m_values;
+    std::function<void(T&&)> m_emit;
+};
+
+// Joining a stream of streams
+//
+// Should be able to combine input from
+// multiple ports. Example:
+//
+// auto pipeline =
+//     values{42042, 42043, 42044}
+//       | transform([&] (int port) { return service(event_loop, port);})
+//       | join()
+//       | sink_to_cerr;
+//
+namespace detail
+{
+  // Output should be the same type as the input
+  template <typename Sender,
+            typename SourceMessageType = typename Sender::value_type,
+            typename MessageType = typename SourceMessageType::value_type>
+  class join_impl
+  {
+    public:
+      using value_type = MessageType;
+
+      void process_message(SourceMessageType&& source)
+      {
+        // Store each stream we listen to
+        m_sources.emplace_back(std::move(source));
+        // Forward the message as our own
+        m_sources.back().set_message_handler(m_emit);
+      }
+    private:
+      Sender m_sender;
+      std::function<void(MessageType&&)> m_emit;
+      std::list<SourceMessageType> m_sources;
+  };
+}
+
+// Filtering reactive streams
+// 
+// Example usage for filtering out comments:
+// auto pipeline =
+//    service(event_loop)
+//    | transform(trim)
+//    | filter([] (const std::string& message) {
+//        return message.length() > && messsage[0] != '#';});
+//    | sink_to_cerr;
+// Filtering listens and emits the same type of messages,
+// unlike transform and join
+template <typename Sender,
+          typename Predicate,
+          typename MessageType = typename Sender::value_type>
+class filter_impl
+{
+  public:
+    using value_type = MessageType;
+  
+    void process_messsage(MessageType&& message) const
+    {
+      if (std::invoke(m_predicate, message))
+        m_emit(std::move(message));
+    }
+  private:
+    Sender m_sender;
+    Predicate m_predicate;
+    std::function<void(MessageType&&)> m_emit;
+};
+
+// Error handling in reactive streams
+// For exceptions, mtry() can be used. It converts
+// functions that throw exceptions into functions that
+// return an expected<T, std::exception_ptr>
+// 
+// With the json library, json::parse can be wrapped to
+// use expected<T,E>
+//
+// However, the data from each JSON object needs to be extracted.
+// In this situation it would be url and text
+//
+// Example usage for wrapping json::parse:
+// auto pipeline =
+//    service(event_loop)
+//    | transform(trim)
+//    | filter([] (const std::string& message) {
+//        return message.length() > && messsage[0] != '#';});
+//    | transform([] (const std::string& message) {
+//            return mtry([&] { return json::parse(message); });
+//              })
+//    | sink_to_cerr;
+//
+
+// We can treat expected<> as a monad and transform instances of
+// expected<> more cleanly.
+// We can mbind an expected<json> along with a bookmark_from_json function.
+// This makes a function that can be used to work with expected_json objects
+// and lifted so it can work on streams of them
+
+// Replying to the client
+// The identity of the client needs to be passed through the whole
+// pipesline since the service object is the one who knows that. It must
+// also not be modified in any of the steps until the end.
+template <typename MessageType>
+struct with_client
+{
+  MessageType value;
+  tcp::socket* socket;
+
+  void reply(const std::string& message) const
+  {
+    auto sptr = std::make_shared<std::string>(message);
+    // Asynchronously write to the socket
+    boost::asio::async_write(*socket, boost::asio::buffer(*sptr, sptr->length()),
+        [sptr] (auto, auto) {});
+  }
+};
+
+// At the end, the sink needs to handle the different possibilities of with_client<>
+// If it's with_client<std::string>, it needs to check for an exception or possibly
+// parse the string and act based on its value
+
+// With this extra level of operation, the previously defined transform and filter
+// functions must be redefined to work on with_client values. However, the previously
+// defined functions can just be put into a different namespace and we can still
+// build off of them.
+
+// Creating actors with a mutable state
+// Mutable state is sometimes necessary. Join keeps track of all of the sources which
+// qualifies as state. 
+// Since actors are independent, they shouldn't share their mutable state.
+
 
 int main(int argc, char** argv)
 {
