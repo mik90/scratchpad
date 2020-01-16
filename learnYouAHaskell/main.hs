@@ -181,7 +181,7 @@ calcBmis xs = [bmi w h | (w, h) <- xs]
 -- They let you bind to variables anywhere and are themselves expressions
 
 -- Cylinder's surface area based on height and radius
-cylinder :: (RealFloat a) => a -> a -> ->a
+cylinder :: (RealFloat a) => a -> a -> a
 cylinder r h =
   let sideArea = 2 * pi * r * h
       topArea = pi * r ^ 2
@@ -240,3 +240,24 @@ describeList xs = "The list is " ++ what xs
   where what [] = "empty"
         what [x] = "a singleton list"
         what xs = "multi-element list"
+
+-- Recursion
+-- Edge condition == base case
+-- In Haskell, recursion is used instead of iteration (as found in imperative languages)
+
+
+-- Finding a maximum recursively
+-- Edge condition would be that the maximum of a singleton list is the only element
+-- in it
+maximum' :: (Ord a) => [a] -> a
+maximum' [] = error "Maximum of empty list"
+maximum' [x] = x
+maximum' (x:xs)
+  | x > maxTail = x -- The maximum of the tail is recursive itself
+  | otherwise = maxTail
+  where maxTail = maximum' xs
+
+-- Pattern matching to split head an tail is a common idioim when doing recursion
+-- with lists
+
+
