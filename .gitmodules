@@ -1,0 +1,3 @@
+[submodule "perfPlayground/thirdParty/benchmark"]
+	path = perfPlayground/thirdParty/benchmark
+	url = https://github.com/google/benchmark.git
