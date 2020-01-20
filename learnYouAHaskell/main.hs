@@ -1,8 +1,9 @@
--- Now on: http://learnyouahaskell.com/recursion
+-- Now on: http://learnyouahaskell.com/higher-order-functions
 
 main :: IO ()
 main = do
-  putStrLn (show $ head' [4,5,6])
+  putStrLn "Running quicksort [1,5,1,3,6,3]"
+  putStrLn (show $ quicksort [1,5,1,3,6,3])
 --  putStrLn (show $ addThree 1 2 3)
 
 addThree :: Int -> Int -> Int -> Int
@@ -137,8 +138,8 @@ a `myCompare` b
   | otherwise = LT
 
 -- Using 'where' clauses allows you to bind names within a function's scope
-bmiTell :: (RealFloat a) => a -> a -> String  
-bmiTell weight height  
+bmiTell2 :: (RealFloat a) => a -> a -> String  
+bmiTell2 weight height  
     | bmi <= skinny = "You're underweight, you emo, you!"  
     | bmi <= normal = "You're supposedly normal. Pffft, I bet you're ugly!"  
     | bmi <= fat    = "You're fat! Lose some weight, fatty!"  
@@ -235,8 +236,8 @@ describeList xs = "The list is " ++ case xs of [] -> "empty"
                                                xs -> "a multi-element list"
 
 -- This could also be defined using 'where' bindings
-describeList :: [a] -> String
-describeList xs = "The list is " ++ what xs
+describeList2 :: [a] -> String
+describeList2 xs = "The list is " ++ what xs
   where what [] = "empty"
         what [x] = "a singleton list"
         what xs = "multi-element list"
@@ -257,7 +258,92 @@ maximum' (x:xs)
   | otherwise = maxTail
   where maxTail = maximum' xs
 
--- Pattern matching to split head an tail is a common idioim when doing recursion
+-- Pattern matching to split head an tail is a common idiom when doing recursion
 -- with lists
 
+maximum2' :: (Ord a) => [a] -> a
+maximum2' [] = error "Empty list"
+maximum2' [x] = x
+maximum2' (x:xs) = max x (maximum2' xs)
+
+-- i must be a value that is both numeric and ordered
+replicate' :: (Num i, Ord i) => i -> a -> [a]
+replicate' n x -- replicate x n times
+    | n <= 0     = []                   -- empty list if replicating 0 times
+    | otherwise  = x:replicate' (n-1) x -- return x and replicate x n - 1 times
+
+
+take' :: (Num i, Ord i) => i -> [a] -> [a]
+take' n _
+    | n <= 0   = []  -- 0 or less elements returns us an empty list, otherwise will fall through
+take' _ []     = []  -- cannot take anything from an empty list
+take' n (x:xs) = x : take' (n-1) xs -- take an element and call n-1 on the rest
+
+
+reverse' :: [a] -> [a]
+reverse' [] = []
+reverse' (x:xs) = reverse' xs ++ [x] -- flip the x:xs and run reverse' on xs
+
+-- Infinitely recursive function
+repeat' :: a -> [a]
+repeat' x = x:repeat' x
+
+-- However, calling something like take 5 (repeat 3) will return a list of five 3's
+-- even though repeat will recurse forever on its own
+
+-- Takes a list of one or two types and returns a list of pairs
+zip' :: [a] -> [b] -> [(a,b)]
+zip' _ [] = [] -- second list is empty, return empty list
+zip' [] _ = [] -- first list is empty, return empty list
+zip' (x:xs) (y:ys) = (x,y):zip' xs ys -- take the heads of boths lists
+
+-- Checks if an element is in a list
+elem' :: (Eq a) => a -> [a] -> Bool
+elem' a [] = False -- empty list
+elem' a (x:xs)
+    | a == x    = True
+    | otherwise = a `elem'` xs -- disregard the head and keep searching
+
+
+quicksort :: (Ord a) => [a] -> [a]
+quicksort [] = [] -- Edge condition
+quicksort (x:xs) =
+    let smallerSorted = quicksort [a | a <- xs, a <= x] -- grab all less than/eq to x
+        biggerSorted  = quicksort [a | a <- xs, a > x]  -- grab all greater than x
+    in smallerSorted ++ [x] ++ biggerSorted
+
+
+-- Higher order functions
+
+-- Technically all functions in haskell take one parameter
+-- Using more parameters is done via currying
+-- max 4 5 actually creates a function that takes a parameter and returns
+-- either 4 or that parameter e.g. "max 4 a" which looks like
+-- (max 4) 5
+
+-- Putting a space between two things is function application
+-- Calling a function with too few parameters returns a partially applied function
+
+multThree :: (Num a) => a -> a -> a -> a
+multThree x y z = x * y * z
+
+-- Can bind it to another name with a parameter
+-- Can multiply tow numbers with 9
+-- Need to bind it with 'let' or pass it to another function if we want
+-- to use multThree in its partially applied form
+let multTwoWithNine = multThree 9
+
+
+-- Infix functions
+-- Can be partially applied by using sections. To do this, surround it with parenthesis
+-- and only supply a parameter on one side
+divideByTen :: (Floating a) => a -> a
+divideByTen = (/10) -- Surrounded by parens
+-- >  divideByTen 200 is the same as 200 / 10 and the same as (/10) 200
+
+-- Checks if the supplied character is uppercase
+isUpperAlphanum :: Char -> Bool
+isUpperAlphanum = (`elem` ['A'..'Z'])
+
+-- Some higher-orderism is in order
 
