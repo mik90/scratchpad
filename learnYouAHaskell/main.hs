@@ -346,4 +346,51 @@ isUpperAlphanum :: Char -> Bool
 isUpperAlphanum = (`elem` ['A'..'Z'])
 
 -- Some higher-orderism is in order
+-- Takes a function and applies it twice
+applyTwice :: (a -> a) -> a -> a
+applyTwice f x = f (f x)
+
+-- First param is a funciton that takes two things and returns a third
+-- Second/third params are lists of things
+zipWith' :: (a -> b -> c) -> [a] -> [b] -> [c]
+zipWith' _ [] _ = [] -- Edge conditions are that a list is empty
+zipWith' _ _ [] = []
+zipWith' f (x:xs) (y:ys) = f x y : zipWith' f xs ys
+-- Runs on the head then recursively runs on the tail
+
+-- flip takes a function and returns the function with the arguments flipped
+flip' :: (a -> b -> c) -> (b -> a -> c)
+flip' f = g
+    where g x y = f y x
+
+-- map takes a function and a list and applies the function to every element in the list
+
+-- map (+3) [1,5,3,1,6] is the same as [x+3 | x <- [1,5,3,1,6]] but map can be more idiomatic
+
+-- filter takes a function and a predicate and returns a list of elements that satisfy
+-- the predicate
+
+quickSortFiltered :: (Ord a) => [a] -> [a]
+quickSortFiltered [] = []
+quickSortFiltered (x:xs) =
+    let smallerSorted = quickSortFiltered (filter (<=x) xs)
+        biggerSorted = quickSortFiltered (filter (>x) xs)
+    in smallerSorted ++ [x] ++ biggerSorted
+
+-- Make use of Haskell's laziness, if you map and filter over a list multiple times, it will
+-- only go over the list once
+
+-- Lambdas
+-- Used with \ and usually surrounded with parentheses (but don't have to be)
+-- e.g. (\xs -> length xs > 15) is a function that tell you if the list passed to it
+-- has a length greater than 15
+
+-- Folds reduce a list to a single value
+-- Summing fold left, starting with 0
+sumFold' :: (Num a) => [a] ->
+sumFold' xs = foldl (+) 0
+
+-- foldl starts from the left, foldr starts from the right
+-- The type of the accumulator and the end result are the same
+
 
