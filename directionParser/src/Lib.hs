@@ -1,28 +1,24 @@
 module Lib
-    ( someFunc
+    ( cliFunc
     ) where
 
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
+import Data.List.Split
 
-
-
-
--- Reads a line, tells us if the line is a palindrome
--- main = interact respondPalindromes
--- '\' means that this is an anonymous function (lambda)
--- using 'interact' means that the input strings will be transformed into "palindrome" or "not a palindrome"
-
-respondPalindromes = unlines . map (\xs -> if isPalindrome xs the
-repeatCommand = do
+cliFunc :: IO ()
+cliFunc = do
     putStrLn "Enter a command"
-    cmd <- getLine
-    if null cmd
-        then do
-            -- Return an empty IO action, don't call main again
-            return ()
+    cmdInput <- getLine
+    if null cmdInput
+        then
             putStrLn "Exiting..."
         else do
             -- Parrot back the command and recursively call main
-            putStrLn $ "This was your command:" ++ cmd
-            repeatCommand
+            putStrLn $ "This was your input:" ++ cmdInput
+            putStrLn $ "commands:" ++ show (filterCommands cmdInput)
+            cliFunc
+
+-- Filter out any words in the input that don't match
+-- on of the words in the command list
+filterCommands :: String -> [String]
+filterCommands x = filter (`elem` cmdList) (splitOneOf "., " x)
+    where cmdList = ["forward", "backward", "left", "right"]

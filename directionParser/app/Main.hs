@@ -19,4 +19,4 @@ import Lib
 -- Although I want to compare it against strings so maybe an enumeration isn't best
 
 main :: IO ()
-main = someFunc
+main = cliFunc
