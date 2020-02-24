@@ -9,7 +9,7 @@ find_package(benchmark REQUIRED)
 
 # Possible flags: -mtune=native, -march=native, -O2 -O3
 # Override all the flags
-set(CMAKE_CXX_FLAGS_RELEASE "-O2 -Wall -Werror")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 # All the binaries use the same compiler commands
 link_libraries(benchmark::benchmark pthread)
@@ -17,3 +17,4 @@ link_libraries(benchmark::benchmark pthread)
 add_executable(constructorTest constructorTest.cpp)
 add_executable(loopTest loopTest.cpp)
 add_executable(stringTest stringTest.cpp)
+add_executable(derefTest derefTest.cpp)
